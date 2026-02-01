@@ -175,6 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
                 <td style="padding: 1rem;">${row.id}</td>
                 <td style="padding: 1rem; font-weight: bold;">${row.name}</td>
+                <td style="padding: 1rem;">${row.class_name || '-'}</td>
+                <td style="padding: 1rem;">${row.father_name || '-'}</td>
                 <td style="padding: 1rem;">${dateStr}</td>
                 <td style="padding: 1rem; font-family: monospace;">${timeStr}</td>
             `;

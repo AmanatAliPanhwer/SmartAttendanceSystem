@@ -7,7 +7,100 @@
 
 const videoElement = document.getElementById("videoElement");
 const captureBtn = document.getElementById("captureBtn");
+// --- Class Tags Logic ---
+const classNameInput = document.getElementById("className"); // Hidden input
+const tagsContainer = document.getElementById("classTagsContainer");
+const newClassArea = document.getElementById("newClassInputArea");
+const newClassInput = document.getElementById("newClassInput");
+const confirmClassBtn = document.getElementById("confirmClassBtn");
+
+async function loadClasses() {
+    try {
+        const res = await fetch("/api/classes");
+        const classes = await res.json();
+        renderTags(classes);
+    } catch (e) {
+        console.error("Failed to load classes", e);
+        // Fallback or empty
+        renderTags([]);
+    }
+}
+
+function renderTags(classes) {
+    tagsContainer.innerHTML = "";
+
+    // Create tags for existing classes
+    classes.forEach(cls => {
+        const tag = document.createElement("div");
+        tag.className = "tag";
+        tag.textContent = cls;
+        tag.onclick = () => selectClass(cls, tag);
+        tagsContainer.appendChild(tag);
+    });
+
+    // Add "+ Custom" tag
+    const addTag = document.createElement("div");
+    addTag.className = "tag tag-add-btn";
+    addTag.textContent = "+ Valid/Custom";
+    addTag.onclick = () => showCustomInput();
+    tagsContainer.appendChild(addTag);
+}
+
+function selectClass(value, tagElement) {
+    // Update Hidden Input
+    classNameInput.value = value;
+
+    // Visual Feedback
+    const allTags = tagsContainer.querySelectorAll(".tag");
+    allTags.forEach(t => t.classList.remove("selected"));
+
+    // If it's a newly added custom tag, it might not be in the initial list, but passed element handles it
+    if (tagElement) {
+        tagElement.classList.add("selected");
+    }
+
+    // Hide custom input if open
+    newClassArea.classList.remove("active");
+}
+
+function showCustomInput() {
+    // Deselect others
+    const allTags = tagsContainer.querySelectorAll(".tag");
+    allTags.forEach(t => t.classList.remove("selected"));
+    classNameInput.value = ""; // Clear current selection until formatted
+
+    newClassArea.classList.add("active");
+    newClassInput.focus();
+}
+
+confirmClassBtn.addEventListener("click", () => {
+    const val = newClassInput.value.trim();
+    if (val) {
+        // Create a temporary visual tag and select it
+        const tempTag = document.createElement("div");
+        tempTag.className = "tag selected";
+        tempTag.textContent = val;
+        tempTag.onclick = () => selectClass(val, tempTag);
+
+        // Insert before the "+ Add" button
+        // The last child is the add button
+        tagsContainer.insertBefore(tempTag, tagsContainer.lastChild);
+
+        // Select it
+        selectClass(val, tempTag);
+
+        // Clear and hide input
+        newClassInput.value = "";
+        newClassArea.classList.remove("active");
+    }
+});
+
+
+// Call on load
+loadClasses();
+
 const usernameInput = document.getElementById("username");
+const fatherNameInput = document.getElementById("fatherName");
 const statusArea = document.getElementById("statusArea");
 
 const captureCanvas = document.getElementById("captureCanvas");
@@ -175,6 +268,9 @@ function drawFeedbackBoxes(matches) {
 
 captureBtn.addEventListener("click", async () => {
     const name = usernameInput.value.trim();
+    const className = classNameInput.value.trim();
+    const fatherName = fatherNameInput.value.trim();
+
     if (!name) {
         alert("Please enter a name first.");
         return;
@@ -194,7 +290,12 @@ captureBtn.addEventListener("click", async () => {
         const response = await fetch("/api/register_capture", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: name, image: imageData }),
+            body: JSON.stringify({
+                name: name,
+                class_name: className,
+                father_name: fatherName,
+                image: imageData
+            }),
         });
         const data = await response.json();
 

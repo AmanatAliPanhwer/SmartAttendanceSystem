@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 class RegisterRequest(BaseModel):
     name: str
+    class_name: Optional[str] = None
+    father_name: Optional[str] = None
     image: str  # Base64 string
 
 
@@ -15,6 +17,8 @@ class RecognizeRequest(BaseModel):
 class AttendanceMatch(BaseModel):
     box: List[int]
     name: str
+    class_name: Optional[str] = None
+    father_name: Optional[str] = None
     similarity: float
     newly_marked: bool
 

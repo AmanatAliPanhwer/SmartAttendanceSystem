@@ -19,11 +19,13 @@ from openpyxl import Workbook
 from pydantic import ValidationError
 from sqlalchemy import desc, extract
 
-from models import Attendance, User, db
+from models import Attendance, StudentClass, User, db
 from schemas import AttendanceMatch, RecognizeRequest, RecognizeResponse, RegisterRequest
 from utils import FaceRecognitionUtils
+import pytz
 
 # --- Configuration & Global State ---
+KARACHI_TZ = pytz.timezone("Asia/Karachi")
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///attendance.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -41,6 +43,7 @@ except Exception as e:
 # For simplicity, we will query DB or load DB into memory.
 # To keep performance high, let's load encodings from DB into memory on startup/reload.
 known_face_encodings = {}
+known_face_metadata = {}  # {name: {class_name, father_name}}
 last_seen_timestamps = {}  # {name: timestamp}
 RECOGNITION_THRESHOLD = 0.5
 ATTENDANCE_COOLDOWN_SECONDS = 60
@@ -50,18 +53,71 @@ def load_face_encodings():
     """
     Loads all face encodings from the database into memory.
     """
-    global known_face_encodings
+    global known_face_encodings, known_face_metadata
     try:
         with app.app_context():
             users = User.query.all()
             known_face_encodings = {u.name: u.get_encoding() for u in users}
+            known_face_metadata = {
+                u.name: {"class_name": u.class_name, "father_name": u.father_name} 
+                for u in users
+            }
             print(f"[System] Loaded {len(known_face_encodings)} encodings from DB.")
     except Exception as e:
         print(f"[Error] Loading encodings from DB: {e}")
         known_face_encodings = {}
+        known_face_metadata = {}
+
+
+def initialize_database():
+    """Creates database tables if they don't exist."""
+    try:
+        with app.app_context():
+            db.create_all()
+            print("[System] Database initialized (Tables created if missing).")
+    except Exception as e:
+        print(f"[Error] Database initialization failed: {e}")
+
+
+def seed_classes():
+    """Seeds the StudentClass table with initial values (1-12) if empty."""
+    try:
+        with app.app_context():
+            # Check if classes exist by trying to query.
+            # If table doesn't exist, this might fail, but since we use db.create_all (or assume it exists), 
+            # we should be careful. 
+            # In this setup, we assume tables are created manually or exist. 
+            # If we were using db.create_all(), we would do it before this.
+            if StudentClass.query.first() is None:
+                print("[System] Seeding initial classes...")
+                initial_classes = [str(i) for i in range(1, 13)]
+                for c_name in initial_classes:
+                    db.session.add(StudentClass(name=c_name))
+                db.session.commit()
+                print("[System] Seeding complete.")
+    except Exception as e:
+        print(f"[Warning] Could not seed classes (Table might not exist yet): {e}")
 
 # Initial load & Migration
+initialize_database()
+seed_classes()
 load_face_encodings()
+
+
+@app.route("/api/classes")
+def get_classes():
+    """Returns list of all available student classes."""
+    classes = StudentClass.query.order_by(StudentClass.name).all()
+    # Sort numerically if possible, otherwise alphabetically
+    # Simple alpha sort: "1", "10", "11", "12", "2"... 
+    # Let's do a smarter sort in python
+    data = [c.name for c in classes]
+    try:
+        data.sort(key=lambda x: int(x) if x.isdigit() else float('inf'))
+    except:
+        data.sort()
+    return jsonify(data)
+
 
 # --- Helper Functions ---
 
@@ -115,6 +171,13 @@ def mark_attendance(name: str) -> tuple[bool, str]:
         return False, "Database Error"
 
 
+def ensure_utc(dt):
+    """Ensures a datetime object is timezone-aware (UTC)."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
+
+
 def decode_base64_to_image(data_url: str) -> np.ndarray:
     """
     Decodes a base64 data URL into an OpenCV image (BGR).
@@ -158,7 +221,13 @@ def build_attendance_query(request_args):
     # Legacy/Simple Date Filter (YYYY-MM-DD)
     date_str = request_args.get("date")
 
-    query = db.session.query(Attendance, User.name).join(User, Attendance.user_id == User.id)
+    # Join User to get metadata
+    query = db.session.query(
+        Attendance, 
+        User.name, 
+        User.class_name, 
+        User.father_name
+    ).join(User, Attendance.user_id == User.id)
 
     if user_id:
         query = query.filter(Attendance.user_id == user_id)
@@ -250,11 +319,13 @@ def get_attendance_records():
         {
             "id": att.id,
             "name": name,
-            "timestamp": att.timestamp.isoformat(),
-            "date_str": att.timestamp.strftime("%Y-%m-%d"),
-            "time_str": att.timestamp.strftime("%H:%M:%S"),
+            "class_name": class_name,
+            "father_name": father_name,
+            "timestamp": ensure_utc(att.timestamp).isoformat(),
+            "date_str": ensure_utc(att.timestamp).astimezone(KARACHI_TZ).strftime("%Y-%m-%d"),
+            "time_str": ensure_utc(att.timestamp).astimezone(KARACHI_TZ).strftime("%H:%M:%S"),
         }
-        for att, name in records
+        for att, name, class_name, father_name in records
     ]
 
     return jsonify(data)
@@ -268,16 +339,20 @@ def export_csv():
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Name", "Date", "Time", "Timestamp"])
+    writer.writerow(["ID", "Name", "Class", "Father's Name", "Date", "Time", "Timestamp"])
 
-    for att, name in records:
+    for att, name, class_name, father_name in records:
+        # Convert to Karachi time for export
+        local_dt = ensure_utc(att.timestamp).astimezone(KARACHI_TZ)
         writer.writerow(
             [
                 att.id,
                 name,
-                att.timestamp.strftime("%Y-%m-%d"),
-                att.timestamp.strftime("%H:%M:%S"),
-                att.timestamp.isoformat(),
+                class_name or "",
+                father_name or "",
+                local_dt.strftime("%Y-%m-%d"),
+                local_dt.strftime("%H:%M:%S"),
+                local_dt.isoformat(),
             ]
         )
 
@@ -297,7 +372,16 @@ def export_json():
     query = build_attendance_query(request.args)
     records = query.all()
 
-    data = [{"id": att.id, "name": name, "timestamp": att.timestamp.isoformat()} for att, name in records]
+    data = [
+        {
+            "id": att.id, 
+            "name": name, 
+            "class_name": class_name,
+            "father_name": father_name,
+            "timestamp": ensure_utc(att.timestamp).isoformat()
+        } 
+        for att, name, class_name, father_name in records
+    ]
 
     return send_file(
         io.BytesIO(json.dumps(data, indent=2).encode("utf-8")),
@@ -318,17 +402,21 @@ def export_excel():
     ws.title = "Attendance Report"
 
     # Headers
-    headers = ["ID", "Name", "Date", "Time", "Timestamp"]
+    headers = ["ID", "Name", "Class", "Father's Name", "Date", "Time", "Timestamp"]
     ws.append(headers)
 
-    for att, name in records:
+    for att, name, class_name, father_name in records:
+        # Convert to Karachi time for export
+        local_dt = ensure_utc(att.timestamp).astimezone(KARACHI_TZ)
         ws.append(
             [
                 att.id,
                 name,
-                att.timestamp.strftime("%Y-%m-%d"),
-                att.timestamp.strftime("%H:%M:%S"),
-                att.timestamp.isoformat(),
+                class_name or "",
+                father_name or "",
+                local_dt.strftime("%Y-%m-%d"),
+                local_dt.strftime("%H:%M:%S"),
+                local_dt.isoformat(),
             ]
         )
 
@@ -359,6 +447,8 @@ def api_register_capture():
         return jsonify({"success": False, "message": str(e)}), 400
 
     name = req_data.name
+    class_name = req_data.class_name
+    father_name = req_data.father_name
     image_data = req_data.image
 
     frame = decode_base64_to_image(image_data)
@@ -391,14 +481,32 @@ def api_register_capture():
         if existing:
             # Update existing? or Reject? Let's update.
             existing.set_encoding(face_embedding)
+            # Update other fields if provided
+            if class_name:
+                existing.class_name = class_name
+            if father_name:
+                existing.father_name = father_name
             db.session.commit()
             msg = f"Updated registration for {name}."
         else:
-            new_user = User(name=name)
+            new_user = User(name=name, class_name=class_name, father_name=father_name)
             new_user.set_encoding(face_embedding)
             db.session.add(new_user)
             db.session.commit()
             msg = f"Successfully registered {name}!"
+
+        # Auto-add class to StudentClass if it doesn't exist
+        if class_name:
+            try:
+                # Check if it exists
+                cls_obj = StudentClass.query.filter_by(name=class_name).first()
+                if not cls_obj:
+                    db.session.add(StudentClass(name=class_name))
+                    db.session.commit()
+                    print(f"[System] Added new class tag: {class_name}")
+            except Exception as e:
+                print(f"[Warning] Failed to auto-add class tag: {e}")
+
 
         # Reload to update memory
         load_face_encodings()
@@ -482,9 +590,19 @@ def api_recognize():
                                 # success case: keep `attendance_error` None -- we use `newly_marked` on the client
                         else:
                             attendance_error = msg
-
+            
+            # Retrieve metadata
+            meta = known_face_metadata.get(name, {})
+            
             matches_payload.append(
-                AttendanceMatch(box=box, name=name, similarity=float(similarity_score), newly_marked=is_newly_marked)
+                AttendanceMatch(
+                    box=box, 
+                    name=name, 
+                    class_name=meta.get("class_name"),
+                    father_name=meta.get("father_name"),
+                    similarity=float(similarity_score), 
+                    newly_marked=is_newly_marked
+                )
             )
 
     else:

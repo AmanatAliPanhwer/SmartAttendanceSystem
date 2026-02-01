@@ -196,8 +196,23 @@ function drawRecognitionBoxes(matches) {
         overlayContext.shadowBlur = 4;
 
         // Label positioning
-        const textY = dy > 30 ? dy - 10 : dy + 30;
-        overlayContext.fillText(name, dx, textY);
+        const textY = dy > 60 ? dy - 10 : dy + dh + 20; // Move up if enough space, else below
+
+        let labelY = textY;
+        overlayContext.fillText(name, dx, labelY);
+
+        // Show Extra Info
+        if (match.class_name || match.father_name) {
+            overlayContext.font = "bold 14px Inter, sans-serif";
+            if (match.class_name) {
+                labelY += 20;
+                overlayContext.fillText(`Class: ${match.class_name}`, dx, labelY);
+            }
+            if (match.father_name) {
+                labelY += 20;
+                overlayContext.fillText(`Father: ${match.father_name}`, dx, labelY);
+            }
+        }
     });
 }
 

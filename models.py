@@ -16,6 +16,8 @@ class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    class_name = db.Column(db.String(50), nullable=True)
+    father_name = db.Column(db.String(100), nullable=True)
     # Storing embedding as a pickled numpy array (BLOB)
     encoding = db.Column(db.LargeBinary, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
@@ -36,3 +38,10 @@ class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     timestamp = db.Column(db.DateTime(timezone=True), default=utc_now)
+
+
+class StudentClass(db.Model):
+    __tablename__ = "student_classes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)

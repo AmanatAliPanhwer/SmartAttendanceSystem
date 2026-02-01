@@ -1,13 +1,7 @@
 {% extends "base.html" %} {% block title %}Reports - Smart Attendance{% endblock
 %} {% block content %}
-<link
-  rel="stylesheet"
-  href="{{ url_for('static', filename='css/flatpickr.min.css') }}"
-/>
-<link
-  rel="stylesheet"
-  href="{{ url_for('static', filename='css/dark.css') }}"
-/>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/flatpickr.min.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dark.css') }}" />
 
 <style>
   .filter-group {
@@ -15,10 +9,12 @@
     flex-direction: column;
     gap: 0.5rem;
   }
+
   .filter-label {
     color: var(--text-muted);
     font-size: 0.9rem;
   }
+
   .filter-control {
     padding: 0.8rem;
     border-radius: 8px;
@@ -29,65 +25,48 @@
     width: 100%;
     transition: border-color 0.2s;
   }
+
   .filter-control:focus {
     border-color: var(--primary-yellow);
   }
+
   .hidden {
     display: none !important;
   }
 </style>
 
 <div style="margin-top: 2rem">
-  <div
-    class="glass-panel"
-    style="padding: 2rem; margin-bottom: 2rem; position: relative; z-index: 10"
-  >
-    <div
-      style="
+  <div class="glass-panel" style="padding: 2rem; margin-bottom: 2rem; position: relative; z-index: 10">
+    <div style="
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
         gap: 1rem;
         margin-bottom: 1.5rem;
-      "
-    >
+      ">
       <h2 style="margin: 0">Attendance Reports</h2>
 
       <div style="display: flex; gap: 0.5rem; flex-wrap: wrap">
-        <button
-          id="btnExportCSV"
-          class="btn btn-outline"
-          style="font-size: 0.9rem"
-        >
+        <button id="btnExportCSV" class="btn btn-outline" style="font-size: 0.9rem">
           Export CSV
         </button>
-        <button
-          id="btnExportJSON"
-          class="btn btn-outline"
-          style="font-size: 0.9rem"
-        >
+        <button id="btnExportJSON" class="btn btn-outline" style="font-size: 0.9rem">
           Export JSON
         </button>
-        <button
-          id="btnExportExcel"
-          class="btn btn-outline"
-          style="font-size: 0.9rem"
-        >
+        <button id="btnExportExcel" class="btn btn-outline" style="font-size: 0.9rem">
           Export Excel
         </button>
       </div>
     </div>
 
     <!-- Filter Bar -->
-    <div
-      style="
+    <div style="
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 1rem;
         align-items: start;
-      "
-    >
+      ">
       <!-- User Filter -->
       <div class="filter-group">
         <label class="filter-label">User</label>
@@ -115,12 +94,7 @@
       <!-- Range Input (Flatpickr) -->
       <div id="rangeInputContainer" class="filter-group hidden">
         <label class="filter-label">Select Range</label>
-        <input
-          type="text"
-          id="rangeFilter"
-          class="filter-control"
-          placeholder="Select Dates..."
-        />
+        <input type="text" id="rangeFilter" class="filter-control" placeholder="Select Dates..." />
       </div>
 
       <!-- Relative Time Input -->
@@ -180,15 +154,15 @@
   <div class="glass-panel" style="padding: 0; overflow: hidden">
     <div style="overflow-x: auto">
       <table style="width: 100%; border-collapse: collapse; text-align: left">
-        <thead
-          style="
+        <thead style="
             background: rgba(255, 215, 0, 0.1);
             border-bottom: 1px solid rgba(255, 215, 0, 0.2);
-          "
-        >
+          ">
           <tr>
             <th style="padding: 1rem">ID</th>
             <th style="padding: 1rem">Name</th>
+            <th style="padding: 1rem">Class</th>
+            <th style="padding: 1rem">Father's Name</th>
             <th style="padding: 1rem">Date</th>
             <th style="padding: 1rem">Time</th>
           </tr>
@@ -199,12 +173,8 @@
       </table>
     </div>
     <!-- Loader -->
-    <div
-      id="loadingSpinner"
-      style="padding: 3rem; text-align: center; display: none"
-    >
-      <div
-        style="
+    <div id="loadingSpinner" style="padding: 3rem; text-align: center; display: none">
+      <div style="
           width: 40px;
           height: 40px;
           border: 3px solid rgba(255, 215, 0, 0.2);
@@ -212,8 +182,7 @@
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
           margin: 0 auto 1rem auto;
-        "
-      ></div>
+        "></div>
       <span style="color: var(--text-muted)">Loading records...</span>
     </div>
     <style>
@@ -223,15 +192,12 @@
         }
       }
     </style>
-    <div
-      id="noDataMessage"
-      style="
+    <div id="noDataMessage" style="
         padding: 2rem;
         text-align: center;
         color: var(--text-muted);
         display: none;
-      "
-    >
+      ">
       No records found.
     </div>
   </div>
