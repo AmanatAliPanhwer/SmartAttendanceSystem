@@ -25,7 +25,7 @@ class User(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
 
     # Relationship
-    attendances = db.relationship("Attendance", backref="user", lazy=True)
+    attendances = db.relationship("Attendance", backref="user", cascade="all, delete-orphan", lazy=True)
 
     def set_encoding(self, np_array):
         self.encoding = pickle.dumps(np_array)

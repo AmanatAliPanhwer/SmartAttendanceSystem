@@ -304,9 +304,12 @@ def delete_user(user_id):
     Deletes a user and their associated biometric files.
     """
     try:
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if not user:
             return jsonify({"success": False, "message": "User not found."}), 404
+
+        # Delete associated attendance records first to avoid integrity errors
+        Attendance.query.filter_by(user_id=user_id).delete()
 
         # Delete files
         face_path = os.path.join("static", "faces", f"{user.id}_face.jpg")
