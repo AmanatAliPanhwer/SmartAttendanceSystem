@@ -1,94 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <link rel="shortcut icon" href="{{ url_for('static', filename='assets/logo.ico') }}" type="image/x-icon">
-    <title>{% block title %}Smart Attendance{% endblock %}</title>
 
-    <!-- PWA Settings -->
-    <meta name="theme-color" content="#FFD700" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
-    <link
-      rel="manifest"
-      href="{{ url_for('static', filename='manifest.json') }}"
-    />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="shortcut icon" href="{{ url_for('static', filename='assets/logo.ico') }}" type="image/x-icon">
+  <title>{% block title %}Smart Attendance{% endblock %}</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/style.css') }}"
-    />
+  <!-- PWA Settings -->
+  <meta name="theme-color" content="#006600" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
 
-    <!-- Service Worker Registration -->
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker
-            .register("{{ url_for('static', filename='sw.js') }}")
-            .then((registration) => {
-              console.log("SW registered:", registration);
-            })
-            .catch((error) => {
-              console.log("SW registration failed:", error);
-            });
-        });
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
+
+  <!-- Institutional CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/institutional.css') }}" />
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("{{ url_for('static', filename='sw.js') }}")
+          .then((registration) => {
+            console.log("SW registered:", registration);
+          })
+          .catch((error) => {
+            console.log("SW registration failed:", error);
+          });
+      });
+    }
+  </script>
+</head>
+
+<body>
+  <!-- Top Bar: Date/Time & Official Links -->
+  <div class="top-bar">
+    <div class="container" style="min-height: auto; border: none; background: transparent;">
+      <span id="current-date"></span>
+      <a href="https://biek.edu.pk/">Official Portal</a>
+      <a href="mailto:info@biek.edu.pk">Contact Us</a>
+    </div>
+  </div>
+
+  <!-- Brand Header -->
+  <header class="brand-header">
+    <div class="container">
+      <img src="{{ url_for('static', filename='assets/biek-logo.png') }}" alt="Board of Intermediate Education Karachi"
+        class="brand-banner" />
+      <h1 class="brand-title">BIOMETRIC SYSTEM</h1>
+    </div>
+  </header>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-links">
+      <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">HOME</a>
+      <a href="/register" class="nav-link {% if request.path == '/register' %}active{% endif %}">REGISTRATION</a>
+
+      <a href="/reports" class="nav-link {% if request.path == '/reports' %}active{% endif %}">REPORTS & DATA</a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container" style="background: transparent; border: none; min-height: auto;">
+      &copy; 2024 Smart Attendance System. All Rights Reserved. <br>
+      Designed & Developed With ❤️ By <a style="color: yellow;" href="https://github.com/AmanatAliPanhwer">Amanat Ali Panhwer</a> for <i>BIEK</i>.
+    </div>
+  </footer>
+
+  <script>
+    // Simple script to set the current date in the top bar
+    const dateElement = document.getElementById('current-date');
+    if (dateElement) {
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      dateElement.textContent = new Date().toLocaleDateString('en-US', options);
+    }
+  </script>
+
+  <!-- Global Feedback Modal -->
+  <div id="feedbackModal" class="modal"
+    style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content"
+      style="background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 400px; text-align: center; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+      <h3 id="modalTitle" style="margin-top: 0; color: var(--primary-green);">Success</h3>
+      <p id="modalMessage" style="font-size: 16px; margin: 20px 0;"></p>
+      <button id="modalOkBtn" class="btn btn-primary" style="min-width: 100px;">OK</button>
+    </div>
+  </div>
+
+  <script>
+    // Modal Logic
+    const modal = document.getElementById("feedbackModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalMessage = document.getElementById("modalMessage");
+    const modalOkBtn = document.getElementById("modalOkBtn");
+
+    function showModal(message, title = "Success") {
+      modalTitle.textContent = title;
+      modalMessage.textContent = message;
+      modal.style.display = "block";
+    }
+
+    function closeModal() {
+      modal.style.display = "none";
+      // Clear URL params if present
+      const url = new URL(window.location);
+      if (url.searchParams.has('msg') || url.searchParams.has('success')) {
+        url.searchParams.delete('msg');
+        url.searchParams.delete('success');
+        window.history.replaceState({}, document.title, url);
       }
-    </script>
-  </head>
+    }
 
-  <body>
-    <nav
-      class="navbar glass-panel"
-      style="
-        border-radius: 0;
-        border: none;
-        border-bottom: 1px solid rgba(255, 215, 0, 0.1);
-      "
-    >
-      <a href="/" class="nav-brand">
-        <img
-          src="{{ url_for('static', filename='assets/logo.png') }}"
-          alt="SmartFace" width="24" height="24"
-        />
-        SmartFace
-      </a>
-      <div class="nav-links">
-        <a
-          href="/"
-          class="nav-link {% if request.path == '/' %}active{% endif %}"
-          >Home</a
-        >
-        <a
-          href="/register"
-          class="nav-link {% if request.path == '/register' %}active{% endif %}"
-          >Register</a
-        >
-        <a
-          href="/recognize"
-          class="nav-link {% if request.path == '/recognize' %}active{% endif %}"
-          >Recognize</a
-        >
-        <a
-          href="/reports"
-          class="nav-link {% if request.path == '/reports' %}active{% endif %}"
-          >Reports</a
-        >
-      </div>
-    </nav>
+    modalOkBtn.onclick = closeModal;
 
-    <div class="container">{% block content %}{% endblock %}</div>
-  </body>
+    // Close on outside click
+    window.onclick = function (event) {
+      if (event.target == modal) {
+        closeModal();
+      }
+    }
+
+    // Check URL parameters on load
+    document.addEventListener("DOMContentLoaded", () => {
+      const params = new URLSearchParams(window.location.search);
+      const msg = params.get("msg") || params.get("success");
+      if (msg) {
+        showModal(msg);
+      }
+    });
+
+    // Expose to window for direct calls
+    window.showGlobalModal = showModal;
+  </script>
+
+</body>
+
 </html>

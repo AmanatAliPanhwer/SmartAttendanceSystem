@@ -7,6 +7,8 @@ class RegisterRequest(BaseModel):
     name: str
     class_name: Optional[str] = None
     father_name: Optional[str] = None
+    gr_number: Optional[str] = None
+    section: Optional[str] = None
     image: str  # Base64 string
 
 

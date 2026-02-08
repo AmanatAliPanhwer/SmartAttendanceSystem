@@ -18,6 +18,8 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     class_name = db.Column(db.String(50), nullable=True)
     father_name = db.Column(db.String(100), nullable=True)
+    gr_number = db.Column(db.String(50), nullable=True)
+    section = db.Column(db.String(10), nullable=True)
     # Storing embedding as a pickled numpy array (BLOB)
     encoding = db.Column(db.LargeBinary, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utc_now)

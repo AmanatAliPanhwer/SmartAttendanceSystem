@@ -108,7 +108,7 @@ const overlayCanvas = document.getElementById("overlayCanvas");
 const captureContext = captureCanvas.getContext("2d");
 const overlayContext = overlayCanvas.getContext("2d");
 
-const videoContainer = document.querySelector(".fullscreen-video-container");
+const videoContainer = document.querySelector(".video-container");
 
 // Configuration
 const CONFIG = {
@@ -122,14 +122,7 @@ let isProcessingFeedback = false;
 
 // --- Initialization ---
 
-// Mobile responsive adjustment
-if (window.innerWidth <= 768) {
-    document.body.classList.add("fullscreen-mode");
-    const mobileOnly = document.querySelector(".mobile-only");
-    const desktopHeader = document.querySelector(".desktop-header");
-    if (mobileOnly) mobileOnly.style.display = "block";
-    if (desktopHeader) desktopHeader.style.display = "none";
-}
+// Mobile responsive adjustment removed
 
 // Start Webcam
 async function startCamera() {
@@ -185,21 +178,19 @@ function startFeedbackLoop() {
 
             const imageData = captureCanvas.toDataURL("image/jpeg", CONFIG.FEEDBACK_QUALITY);
 
-            const response = await fetch("/api/recognize", {
+            const response = await fetch("/api/detect_faces", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ image: imageData }),
             });
             const data = await response.json();
 
-            if (data.success) {
-                const matches = data.matches.map((m) => {
-                    return {
-                        ...m,
-                        box: m.box.map((coord) => coord / scale),
-                    };
+            if (data.success && data.boxes) {
+                // Upscale boxes
+                const boxes = data.boxes.map((box) => {
+                    return box.map((coord) => coord / scale);
                 });
-                drawFeedbackBoxes(matches);
+                drawFeedbackBoxes(boxes);
             }
         } catch (err) {
             // Silently fail for feedback loop to avoid spamming console
@@ -209,55 +200,29 @@ function startFeedbackLoop() {
     }, CONFIG.FEEDBACK_INTERVAL_MS);
 }
 
-function drawFeedbackBoxes(matches) {
+function drawFeedbackBoxes(boxes) {
     overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-    const isMobile = window.innerWidth <= 768;
-    const fitMode = isMobile ? "cover" : "contain";
+    const displayedWidth = videoElement.clientWidth;
+    const displayedHeight = videoElement.clientHeight;
 
-    const videoRatio = videoElement.videoWidth / videoElement.videoHeight;
-    const containerRatio = overlayCanvas.width / overlayCanvas.height;
-
-    let drawWidth, drawHeight, startX, startY;
-
-    if (fitMode === "cover") {
-        if (containerRatio > videoRatio) {
-            drawWidth = overlayCanvas.width;
-            drawHeight = drawWidth / videoRatio;
-            startX = 0;
-            startY = (overlayCanvas.height - drawHeight) / 2;
-        } else {
-            drawHeight = overlayCanvas.height;
-            drawWidth = drawHeight * videoRatio;
-            startX = (overlayCanvas.width - drawWidth) / 2;
-            startY = 0;
-        }
-    } else {
-        // Contain
-        if (containerRatio > videoRatio) {
-            drawHeight = overlayCanvas.height;
-            drawWidth = drawHeight * videoRatio;
-            startX = (overlayCanvas.width - drawWidth) / 2;
-            startY = 0;
-        } else {
-            drawWidth = overlayCanvas.width;
-            drawHeight = drawWidth / videoRatio;
-            startX = 0;
-            startY = (overlayCanvas.height - drawHeight) / 2;
-        }
+    if (overlayCanvas.width !== displayedWidth || overlayCanvas.height !== displayedHeight) {
+        overlayCanvas.width = displayedWidth;
+        overlayCanvas.height = displayedHeight;
     }
 
-    const displayScale = drawWidth / videoElement.videoWidth;
+    const scaleX = displayedWidth / videoElement.videoWidth;
+    const scaleY = displayedHeight / videoElement.videoHeight;
 
-    matches.forEach((match) => {
-        const [x1, y1, x2, y2] = match.box;
+    boxes.forEach((box) => {
+        const [x1, y1, x2, y2] = box;
 
-        const dx = startX + x1 * displayScale;
-        const dy = startY + y1 * displayScale;
-        const dw = (x2 - x1) * displayScale;
-        const dh = (y2 - y1) * displayScale;
+        const dx = x1 * scaleX;
+        const dy = y1 * scaleY;
+        const dw = (x2 - x1) * scaleX;
+        const dh = (y2 - y1) * scaleY;
 
-        overlayContext.strokeStyle = "var(--success)"; // Green for feedback
+        overlayContext.strokeStyle = "#00FF7F"; // Green
         overlayContext.lineWidth = 4;
         overlayContext.lineJoin = "round";
         overlayContext.strokeRect(dx, dy, dw, dh);
@@ -266,10 +231,15 @@ function drawFeedbackBoxes(matches) {
 
 // --- Capture Handler ---
 
+const grNumberInput = document.getElementById("grNumber");
+const sectionInput = document.getElementById("section");
+
 captureBtn.addEventListener("click", async () => {
     const name = usernameInput.value.trim();
     const className = classNameInput.value.trim();
     const fatherName = fatherNameInput.value.trim();
+    const grNumber = grNumberInput.value.trim();
+    const section = sectionInput.value;
 
     if (!name) {
         alert("Please enter a name first.");
@@ -294,6 +264,8 @@ captureBtn.addEventListener("click", async () => {
                 name: name,
                 class_name: className,
                 father_name: fatherName,
+                gr_number: grNumber,
+                section: section,
                 image: imageData
             }),
         });
@@ -301,7 +273,11 @@ captureBtn.addEventListener("click", async () => {
 
         if (data.success) {
             statusArea.innerHTML = `<span class="status-success" style="display:block; text-align:center;">${data.message}</span>`;
-            usernameInput.value = "";
+            // Redirect to reports page after a short delay
+            setTimeout(() => {
+                // Use encodeURIComponent to handle special characters if necessary, though message is usually simple
+                window.location.href = "/reports?success=" + encodeURIComponent("Registration Successful!");
+            }, 1000);
         } else {
             statusArea.innerHTML = `<span class="status-error" style="display:block; text-align:center;">${data.message}</span>`;
         }
@@ -314,11 +290,41 @@ captureBtn.addEventListener("click", async () => {
     }
 });
 
-// Handle Resize
-window.addEventListener("resize", () => {
-    if (window.innerWidth <= 768) {
-        document.body.classList.add("fullscreen-mode");
-    } else {
-        document.body.classList.remove("fullscreen-mode");
+// Resize listener removed
+
+// --- Recapture / Pre-fill Logic ---
+function checkUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get("name");
+    const className = params.get("class_name");
+    const fatherName = params.get("father_name");
+    const grNumber = params.get("gr_number");
+    const section = params.get("section");
+
+    if (name) usernameInput.value = name;
+    if (fatherName) fatherNameInput.value = fatherName;
+    if (grNumber) grNumberInput.value = grNumber;
+    if (section) sectionInput.value = section;
+
+    if (className) {
+        // Set value immediately
+        classNameInput.value = className;
+
+        // Try to find and visually select the tag after a short delay (to ensure tags loaded)
+        setTimeout(() => {
+            const allTags = tagsContainer.querySelectorAll(".tag");
+            let found = false;
+            for (let tag of allTags) {
+                if (tag.textContent === className) {
+                    selectClass(className, tag);
+                    found = true;
+                    break;
+                }
+            }
+            // If not found (custom class), we could create a visual tag, 
+            // but for now relying on the hidden input is sufficient.
+        }, 500);
     }
-});
+}
+
+checkUrlParams();

@@ -256,3 +256,48 @@ class FaceRecognitionUtils:
             scale = max_side / max(h, w)
             img = cv2.resize(img, (int(w * scale), int(h * scale)))
         return img, scale
+    
+    def generate_face_map(self, img_rgb: np.ndarray, landmarks: List[Tuple[int, int]]) -> np.ndarray:
+        """
+        Creates a black image with white wireframe/dots of the face landmarks.
+        
+        Args:
+            img_rgb (np.ndarray): Source image (used for dimensions).
+            landmarks (List[Tuple[int, int]]): List of (x,y) landmarks.
+
+        Returns:
+            np.ndarray: Black and white face map (RGB format).
+        """
+        h, w = img_rgb.shape[:2]
+        canvas = np.zeros((h, w, 3), dtype=np.uint8)
+        
+        # Mediapipe Mesh connections would be ideal, but for now let's draw points 
+        # or simple lines if we had the topology. 
+        # Drawing 468 points is a good start for a "biometric map".
+        for (x, y) in landmarks:
+            cv2.circle(canvas, (x, y), 1, (255, 255, 255), -1)
+
+        # Let's try to draw some contours if possible, but points look "data-like".
+        # We can also crop this canvas to the face bbox later if needed, 
+        # but the request implies a map of the face.
+        return canvas
+
+    def get_aligned_face(self, img_rgb: np.ndarray, box: Tuple[int, int, int, int], size: int = 112) -> Optional[np.ndarray]:
+        """
+        Extracts the aligned face image.
+
+        Args:
+           img_rgb (np.ndarray): Input RGB image.
+           box (Tuple[int, int, int, int]): Bounding box.
+           size (int): Output size.
+
+        Returns:
+           Optional[np.ndarray]: Aligned face image (RGB).
+        """
+        img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+        landmarks = self.get_face_landmarks_mediapipe(img_bgr, box)
+        if landmarks is None:
+            return None
+        
+        aligned_rgb = self.align_face_by_eyes(img_rgb, landmarks, output_size=size)
+        return aligned_rgb

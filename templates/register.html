@@ -1,147 +1,94 @@
 {% extends "base.html" %} {% block content %}
-<!-- Back Button (Mobile Only via CSS) -->
-<a href="/" class="fullscreen-back-btn">
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-    stroke-linecap="round" stroke-linejoin="round">
-    <path d="M19 12H5" />
-    <path d="M12 19l-7-7 7-7" />
-  </svg>
-</a>
 
-<div class="container" id="mainContainer">
-  <!-- Header (Hidden on Mobile Fullscreen via CSS) -->
-  <h2 class="desktop-header" style="
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      padding-bottom: 1rem;
-    ">
-    Register New User
-  </h2>
+<h2>Register New User</h2>
 
-  <!-- Video Container -->
-  <div class="fullscreen-video-container">
-    <video id="videoElement" autoplay playsinline muted></video>
-    <canvas id="overlayCanvas"></canvas>
-    <canvas id="captureCanvas" style="display: none"></canvas>
-  </div>
+<div class="container" id="mainContainer" style="border: none; padding: 0;">
+  <div style="display: flex; flex-wrap: wrap; gap: 20px;">
 
-  <!-- Controls -->
-  <div class="bottom-sheet">
-    <h3 class="mobile-only" style="color: var(--primary-yellow); margin-bottom: 0.5rem; display: none">
-      Register Face
-    </h3>
-
-    <div>
-      <label style="
-          display: block;
-          margin-bottom: 0.5rem;
-          color: var(--text-muted);
-          font-size: 0.9rem;
-        ">Full Name</label>
-      <input type="text" id="username" placeholder="e.g. John Doe" />
+    <!-- Video Section -->
+    <div style="flex: 1; min-width: 300px;">
+      <div class="video-container">
+        <video id="videoElement" autoplay playsinline muted class="video-feed"></video>
+        <canvas id="overlayCanvas"
+          style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></canvas>
+        <canvas id="captureCanvas" style="display: none"></canvas>
+      </div>
+      <div id="statusArea" class="status-msg" style="display: none;"></div>
     </div>
 
-    <style>
-      .tags-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-      }
+    <!-- Form Section -->
+    <div style="flex: 1; min-width: 300px; background: #f9f9f9; padding: 20px; border: 1px solid #ccc;">
+      <h3>User Details</h3>
 
-      .tag {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        cursor: pointer;
-        transition: all 0.2s;
-        user-select: none;
-      }
+      <label>Full Name</label>
+      <input type="text" id="username" placeholder="e.g. John Doe" />
 
-      .tag.selected {
-        background: var(--primary-yellow);
-        color: #000;
-        border-color: var(--primary-yellow);
-        font-weight: 600;
-      }
+      <label>GR Number</label>
+      <input type="text" id="grNumber" placeholder="e.g. GR-2024-001" />
 
-      .tag:hover:not(.selected) {
-        background: rgba(255, 255, 255, 0.2);
-        color: #fff;
-      }
+      <label>Section</label>
+      <select id="section" style="width: 100%; padding: 6px; margin-bottom: 10px; border: 1px solid #999;">
+        <option value="" disabled selected>Select Section</option>
+        <option value="A">Section A</option>
+        <option value="B">Section B</option>
+        <option value="C">Section C</option>
+        <option value="D">Section D</option>
+        <option value="E">Section E</option>
+      </select>
 
-      .tag-add-btn {
-        background: transparent;
-        border: 1px dashed rgba(255, 255, 255, 0.4);
-        color: var(--text-muted);
-      }
-
-      .tag-input-wrapper {
-        display: none;
-        /* Hidden by default */
-        margin-top: 0.5rem;
-      }
-
-      .tag-input-wrapper.active {
-        display: flex;
-        gap: 0.5rem;
-      }
-
-      .tag-input-wrapper input {
-        flex: 1;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        background: rgba(0, 0, 0, 0.3);
-        color: white;
-      }
-    </style>
-
-    <div>
-      <label style="
-          display: block;
-          margin-bottom: 0.5rem;
-          color: var(--text-muted);
-          font-size: 0.9rem;
-        ">Class</label>
-
-      <!-- Hidden Input to store selected value -->
+      <label>Class / Designation</label>
       <input type="hidden" id="className" />
 
-      <!-- Tags Area -->
-      <div id="classTagsContainer" class="tags-container">
-        <!-- Tags will be injected here via JS -->
+      <!-- Simplified Tags for Institutional Look -->
+      <div id="classTagsContainer" style="margin-bottom: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
+        <!-- Tags injected by JS -->
       </div>
 
-      <!-- Add New Class Input (Hidden initially) -->
-      <div id="newClassInputArea" class="tag-input-wrapper">
+      <div id="newClassInputArea" style="display: none; gap: 5px; margin-bottom: 10px;">
         <input type="text" id="newClassInput" placeholder="Enter class name" />
-        <button id="confirmClassBtn" class="btn btn-sm"
-          style="background:var(--primary-yellow); color:black; padding: 0 0.5rem;">OK</button>
+        <button id="confirmClassBtn" class="btn" style="background:#ddd;">OK</button>
+      </div>
+
+      <label>Father's Name</label>
+      <input type="text" id="fatherName" placeholder="e.g. Robert Doe" />
+
+      <div style="margin-top: 20px;">
+        <button id="captureBtn" class="btn btn-primary" style="width: 100%;">
+          Capture & Register
+        </button>
       </div>
     </div>
 
-    <div>
-      <label style="
-          display: block;
-          margin-bottom: 0.5rem;
-          color: var(--text-muted);
-          font-size: 0.9rem;
-        ">Father's Name</label>
-      <input type="text" id="fatherName" placeholder="e.g. Robert Doe" />
-    </div>
-
-    <div style="display: flex; flex-direction: column; gap: 1rem">
-      <button id="captureBtn" class="btn btn-primary" style="width: 100%">
-        Capture & Register
-      </button>
-      <div id="statusArea" style="min-height: 20px"></div>
-    </div>
   </div>
 </div>
+
+<!-- Inline styles for the tags to match new theme -->
+<style>
+  .tag {
+    background: #e0e0e0;
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #333;
+  }
+
+  .tag.selected {
+    background: var(--primary-green);
+    color: white;
+    border-color: var(--secondary-green);
+  }
+
+  .tag:hover:not(.selected) {
+    background: #d0d0d0;
+  }
+
+  .tag-add-btn {
+    background: transparent;
+    border: 1px dashed #999;
+    color: #666;
+  }
+</style>
 
 <script src="{{ url_for('static', filename='js/register.js') }}"></script>
 {% endblock %}

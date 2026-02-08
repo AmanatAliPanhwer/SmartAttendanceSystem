@@ -1,215 +1,109 @@
-{% extends "base.html" %} {% block title %}Reports - Smart Attendance{% endblock
-%} {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/flatpickr.min.css') }}" />
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dark.css') }}" />
-
-<style>
-  .filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .filter-label {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-  }
-
-  .filter-control {
-    padding: 0.8rem;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.2);
-    color: white;
-    outline: none;
-    width: 100%;
-    transition: border-color 0.2s;
-  }
-
-  .filter-control:focus {
-    border-color: var(--primary-yellow);
-  }
-
-  .hidden {
-    display: none !important;
-  }
-</style>
+{% extends "base.html" %} {% block title %}Biometric Registry - Smart Attendance{% endblock %}
+{% block content %}
 
 <div style="margin-top: 2rem">
-  <div class="glass-panel" style="padding: 2rem; margin-bottom: 2rem; position: relative; z-index: 10">
-    <div style="
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-      ">
-      <h2 style="margin: 0">Attendance Reports</h2>
-
-      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap">
-        <button id="btnExportCSV" class="btn btn-outline" style="font-size: 0.9rem">
-          Export CSV
-        </button>
-        <button id="btnExportJSON" class="btn btn-outline" style="font-size: 0.9rem">
-          Export JSON
-        </button>
-        <button id="btnExportExcel" class="btn btn-outline" style="font-size: 0.9rem">
-          Export Excel
-        </button>
+  <div class="card">
+    <div
+      style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+      <h2 style="margin: 0; font-size: 24px;">Biometric Registry</h2>
+      <div style="display: flex; gap: 10px;">
+        <a href="/api/export/excel" class="btn btn-outline" style="text-decoration: none;">⬇ Export Excel</a>
+        <a href="/api/export/db" class="btn btn-outline" style="text-decoration: none;">⬇ Backup DB</a>
+        <a href="{{ url_for('register_page') }}" class="btn btn-primary" style="text-decoration: none;">+ Register New
+          User</a>
       </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div style="
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        align-items: start;
-      ">
-      <!-- User Filter -->
-      <div class="filter-group">
-        <label class="filter-label">User</label>
-        <select id="userFilter" class="filter-control">
-          <option value="">All Users</option>
-          {% for user in users %}
-          <option value="{{ user.id }}">{{ user.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- Filter Mode Selector -->
-      <div class="filter-group">
-        <label class="filter-label">Filter Mode</label>
-        <select id="filterMode" class="filter-control">
-          <option value="today">Today</option>
-          <option value="range">Date Range</option>
-          <option value="relative">Relative Time</option>
-          <option value="granular">Year / Month / Day</option>
-        </select>
-      </div>
-
-      <!-- Dynamic Inputs -->
-
-      <!-- Range Input (Flatpickr) -->
-      <div id="rangeInputContainer" class="filter-group hidden">
-        <label class="filter-label">Select Range</label>
-        <input type="text" id="rangeFilter" class="filter-control" placeholder="Select Dates..." />
-      </div>
-
-      <!-- Relative Time Input -->
-      <div id="relativeInputContainer" class="filter-group hidden">
-        <label class="filter-label">Time Period</label>
-        <select id="relativeFilter" class="filter-control">
-          <option value="30m">Last 30 Minutes</option>
-          <option value="1h">Last 1 Hour</option>
-          <option value="2h">Last 2 Hours</option>
-          <option value="6h">Last 6 Hours</option>
-          <option value="12h">Last 12 Hours</option>
-          <option value="24h">Last 24 Hours</option>
-        </select>
-      </div>
-
-      <!-- Granular Inputs (Y/M/D) -->
-      <!-- We wrap them in one container for layout or keep separate? 
-                  Let's keep them separate but conditional. 
-                  Actually checking if we can fit them nicely. -->
-      <div id="granularYearContainer" class="filter-group hidden">
-        <label class="filter-label">Year</label>
-        <select id="yearFilter" class="filter-control">
-          <option value="">Any Year</option>
-          <!-- Populated by JS or Jinja? JS is easier for dynamic years -->
-        </select>
-      </div>
-      <div id="granularMonthContainer" class="filter-group hidden">
-        <label class="filter-label">Month</label>
-        <select id="monthFilter" class="filter-control">
-          <option value="">Any Month</option>
-          <option value="1">January</option>
-          <option value="2">February</option>
-          <option value="3">March</option>
-          <option value="4">April</option>
-          <option value="5">May</option>
-          <option value="6">June</option>
-          <option value="7">July</option>
-          <option value="8">August</option>
-          <option value="9">September</option>
-          <option value="10">October</option>
-          <option value="11">November</option>
-          <option value="12">December</option>
-        </select>
-      </div>
-      <div id="granularDayContainer" class="filter-group hidden">
-        <label class="filter-label">Day</label>
-        <select id="dayFilter" class="filter-control">
-          <option value="">Any Day</option>
-          {% for i in range(1, 32) %}
-          <option value="{{ i }}">{{ i }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="glass-panel" style="padding: 0; overflow: hidden">
-    <div style="overflow-x: auto">
-      <table style="width: 100%; border-collapse: collapse; text-align: left">
-        <thead style="
-            background: rgba(255, 215, 0, 0.1);
-            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
-          ">
-          <tr>
-            <th style="padding: 1rem">ID</th>
-            <th style="padding: 1rem">Name</th>
-            <th style="padding: 1rem">Class</th>
-            <th style="padding: 1rem">Father's Name</th>
-            <th style="padding: 1rem">Date</th>
-            <th style="padding: 1rem">Time</th>
+    <!-- Registry Table -->
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="text-align: left; background-color: #f9f9f9;">
+            <th style="padding: 12px; border-bottom: 2px solid #ddd;">ID</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd;">Name</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd;">Class</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd;">Section</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd;">Father's Name</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd;">GR Number</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: center;">Registered Face</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: center;">Biometric Map</th>
+            <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: center;">Actions</th>
           </tr>
         </thead>
-        <tbody id="reportsTableBody">
-          <!-- Rows injected by JS -->
+        <tbody>
+          {% for user in users %}
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 12px;">{{ user.id }}</td>
+            <td style="padding: 12px; font-weight: bold;">{{ user.name }}</td>
+            <td style="padding: 12px;">{{ user.class_name or '-' }}</td>
+            <td style="padding: 12px;">{{ user.section or '-' }}</td>
+            <td style="padding: 12px;">{{ user.father_name or '-' }}</td>
+            <td style="padding: 12px;">{{ user.gr_number or '-' }}</td>
+
+            <!-- Face Image -->
+            <td style="padding: 12px; text-align: center;">
+              <div
+                style="display: inline-block; width: 80px; height: 80px; overflow: hidden; border-radius: 8px; border: 1px solid #ddd; background: #f0f0f0;">
+                <img src="{{ url_for('static', filename='faces/' ~ user.id ~ '_face.jpg') }}" alt="Face"
+                  style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;"
+                  onclick="openImageViewer(this.src)"
+                  onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2NjYyIgZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OSA0IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYy04LTIuNjYtNS4zMy00LTgtNHoiLz48L3N2Zz4='; this.style.padding='10px'; this.style.objectFit='contain';">
+              </div>
+            </td>
+
+            <!-- Biometric Map -->
+            <td style="padding: 12px; text-align: center;">
+              <div
+                style="display: inline-block; width: 80px; height: 80px; overflow: hidden; border-radius: 8px; border: 1px solid #333; background: #000;">
+                <img src="{{ url_for('static', filename='faces/' ~ user.id ~ '_map.jpg') }}" alt="Map"
+                  style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;"
+                  onclick="openImageViewer(this.src)" onerror="this.onerror=null; this.style.display='none';">
+              </div>
+            </td>
+
+            <!-- Actions -->
+            <td style="padding: 12px; text-align: center;">
+              <div style="display: flex; gap: 5px; justify-content: center;">
+                <a href="{{ url_for('register_page', name=user.name, class_name=user.class_name, father_name=user.father_name, gr_number=user.gr_number, section=user.section) }}"
+                  class="btn btn-sm btn-outline"
+                  style="text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border: 1px solid #ccc; color: #333; background: white; border-radius: 4px;">Recapture</a>
+                <button onclick="deleteUser('{{ user.id }}', '{{ user.name }}')" class="btn btn-sm"
+                  style="background: #ff4d4d; color: white; border: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Delete</button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" style="padding: 20px; text-align: center; color: #666;">No registered users found.</td>
+          </tr>
+          {% endfor %}
         </tbody>
       </table>
-    </div>
-    <!-- Loader -->
-    <div id="loadingSpinner" style="padding: 3rem; text-align: center; display: none">
-      <div style="
-          width: 40px;
-          height: 40px;
-          border: 3px solid rgba(255, 215, 0, 0.2);
-          border-top-color: var(--primary-yellow);
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          margin: 0 auto 1rem auto;
-        "></div>
-      <span style="color: var(--text-muted)">Loading records...</span>
-    </div>
-    <style>
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-    </style>
-    <div id="noDataMessage" style="
-        padding: 2rem;
-        text-align: center;
-        color: var(--text-muted);
-        display: none;
-      ">
-      No records found.
     </div>
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/flatpickr.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/custom_select.js') }}"></script>
 <script>
-  // Setup custom selects after DOM ready but before reports.js runs
-  document.addEventListener("DOMContentLoaded", () => {
-    setupCustomSelects("select.filter-control");
-  });
+  async function deleteUser(userId, userName) {
+    if (!confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/delete_user/${userId}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.success) {
+        // Reload with success message
+        window.location.href = window.location.pathname + "?success=" + encodeURIComponent(data.message);
+      } else {
+        alert("Error: " + data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete user.");
+    }
+  }
 </script>
-<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+<script src="{{ url_for('static', filename='js/image_viewer.js') }}"></script>
 {% endblock %}
