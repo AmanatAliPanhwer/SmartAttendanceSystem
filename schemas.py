@@ -9,6 +9,7 @@ class RegisterRequest(BaseModel):
     father_name: Optional[str] = None
     gr_number: Optional[str] = None
     section: Optional[str] = None
+    gender: Optional[str] = None
     image: str  # Base64 string
 
 
@@ -21,6 +22,7 @@ class AttendanceMatch(BaseModel):
     name: str
     class_name: Optional[str] = None
     father_name: Optional[str] = None
+    gender: Optional[str] = None
     similarity: float
     newly_marked: bool
 

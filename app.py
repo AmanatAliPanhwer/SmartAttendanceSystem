@@ -70,7 +70,7 @@ def seed_classes():
         with app.app_context():
             if StudentClass.query.first() is None:
                 print("[System] Seeding initial classes...")
-                initial_classes = [str(i) for i in range(1, 13)]
+                initial_classes = [str(i) for i in range(9, 13)]
                 for c_name in initial_classes:
                     db.session.add(StudentClass(name=c_name))
                 db.session.commit()
@@ -167,6 +167,7 @@ def api_register_capture():
     father_name = req_data.father_name
     gr_number = req_data.gr_number
     section = req_data.section
+    gender = req_data.gender
     image_data = req_data.image
 
     frame = decode_base64_to_image(image_data)
@@ -203,6 +204,7 @@ def api_register_capture():
             if father_name: existing.father_name = father_name
             if gr_number: existing.gr_number = gr_number
             if section: existing.section = section
+            if gender: existing.gender = gender
             existing.set_encoding(face_embedding)
             db.session.commit()
         else:
@@ -212,7 +214,8 @@ def api_register_capture():
                 class_name=class_name, 
                 father_name=father_name,
                 gr_number=gr_number,
-                section=section
+                section=section,
+                gender=gender
             )
             new_user.set_encoding(face_embedding)
             db.session.add(new_user)
@@ -341,13 +344,13 @@ def export_excel():
         ws.title = "Biometric Registry"
 
         # Headers
-        headers = ["ID", "Name", "Class", "Section", "Father Name", "GR Number", "Registration Date"]
+        headers = ["ID", "Name", "Class", "Section", "Father Name", "GR Number", "Gender", "Registration Date"]
         ws.append(headers)
 
         # Data
         for user in users:
             # Format date if available
-            ws.append([user.id, user.name, user.class_name, user.section, user.father_name, user.gr_number, "N/A"])
+            ws.append([user.id, user.name, user.class_name, user.section, user.father_name, user.gr_number, user.gender or "N/A", "N/A"])
 
         # Save to memory buffer
         out = io.BytesIO()

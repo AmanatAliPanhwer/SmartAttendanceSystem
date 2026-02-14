@@ -101,6 +101,7 @@ loadClasses();
 
 const usernameInput = document.getElementById("username");
 const fatherNameInput = document.getElementById("fatherName");
+const genderInput = document.getElementById("gender");
 const statusArea = document.getElementById("statusArea");
 
 const captureCanvas = document.getElementById("captureCanvas");
@@ -240,6 +241,7 @@ captureBtn.addEventListener("click", async () => {
     const fatherName = fatherNameInput.value.trim();
     const grNumber = grNumberInput.value.trim();
     const section = sectionInput.value;
+    const gender = genderInput.value;
 
     if (!name) {
         alert("Please enter a name first.");
@@ -266,6 +268,7 @@ captureBtn.addEventListener("click", async () => {
                 father_name: fatherName,
                 gr_number: grNumber,
                 section: section,
+                gender: gender,
                 image: imageData
             }),
         });
@@ -300,11 +303,13 @@ function checkUrlParams() {
     const fatherName = params.get("father_name");
     const grNumber = params.get("gr_number");
     const section = params.get("section");
+    const gender = params.get("gender");
 
     if (name) usernameInput.value = name;
     if (fatherName) fatherNameInput.value = fatherName;
     if (grNumber) grNumberInput.value = grNumber;
     if (section) sectionInput.value = section;
+    if (gender) genderInput.value = gender;
 
     if (className) {
         // Set value immediately
