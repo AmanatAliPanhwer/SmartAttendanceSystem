@@ -16,19 +16,24 @@ import numpy as np
 import onnxruntime as ort
 
 
+from path_utils import get_resource_path
+
 class FaceRecognitionUtils:
     """
     Utilities for face detection, alignment, and embedding extraction using
     Mediapipe and ONNX Runtime.
     """
 
-    def __init__(self, emb_model_path: str = "models/arcface_mobile.onnx") -> None:
+    def __init__(self, emb_model_path: str = None) -> None:
         """
         Initialize the FaceRecognitionUtils with model paths.
 
         Args:
             emb_model_path (str): Path to the ONNX embedding model.
         """
+        if emb_model_path is None:
+            emb_model_path = get_resource_path("models/arcface_mobile.onnx")
+        
         self.EMB_MODEL_PATH = emb_model_path
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(

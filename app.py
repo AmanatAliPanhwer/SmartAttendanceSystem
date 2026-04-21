@@ -24,10 +24,24 @@ from schemas import AttendanceMatch, RecognizeRequest, RecognizeResponse, Regist
 from utils import FaceRecognitionUtils
 import pytz
 
+from path_utils import get_resource_path, get_executable_dir
+
 # --- Configuration & Global State ---
 KARACHI_TZ = pytz.timezone("Asia/Karachi")
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///attendance.db"
+
+# For Bundled Resources (Static/Templates)
+template_dir = get_resource_path("templates")
+static_dir = get_resource_path("static")
+
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+
+# For Persistent Database (outside EXE)
+db_dir = os.path.join(get_executable_dir(), "instance")
+if not os.path.exists(db_dir):
+    os.makedirs(db_dir)
+db_path = os.path.join(db_dir, "attendance.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
