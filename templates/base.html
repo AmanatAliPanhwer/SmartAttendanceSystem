@@ -67,6 +67,16 @@
       </a>
       <div class="nav-links">
         <a
+          href="/dashboard"
+          class="nav-link {% if request.path == '/dashboard' %}active{% endif %}"
+          >Dashboard</a
+        >
+        <a
+          href="/student_analytics"
+          class="nav-link {% if request.path == '/student_analytics' %}active{% endif %}"
+          >Students</a
+        >
+        <a
           href="/"
           class="nav-link {% if request.path == '/' %}active{% endif %}"
           >Home</a
@@ -85,6 +95,11 @@
           href="/reports"
           class="nav-link {% if request.path == '/reports' %}active{% endif %}"
           >Reports</a
+        >
+        <a
+          href="/settings"
+          class="nav-link {% if request.path == '/settings' %}active{% endif %}"
+          >Settings</a
         >
       </div>
     </nav>

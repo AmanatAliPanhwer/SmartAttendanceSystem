@@ -21,7 +21,7 @@ const videoContainer = document.querySelector(".fullscreen-video-container");
 
 // Configuration
 const CONFIG = {
-    REFRESH_INTERVAL_MS: 500,
+    REFRESH_INTERVAL_MS: 50,
     IMAGE_QUALITY: 0.7,
     SEND_WIDTH: 640
 };

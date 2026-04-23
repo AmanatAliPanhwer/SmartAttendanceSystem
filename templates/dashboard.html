@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Smart Attendance{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <header class="page-header">
+        <h1>Interactive Dashboard</h1>
+        <p>Real-time attendance insights and statistics.</p>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card glass-panel">
+            <div class="stat-icon">👥</div>
+            <div class="stat-info">
+                <h3 id="total-students">-</h3>
+                <p>Total Students</p>
+            </div>
+        </div>
+        <div class="stat-card glass-panel">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+                <h3 id="today-attendance">-</h3>
+                <p>Present Today</p>
+            </div>
+        </div>
+        <div class="stat-card glass-panel">
+            <div class="stat-icon">📅</div>
+            <div class="stat-info">
+                <h3 id="current-date">-</h3>
+                <p>Today's Date</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-container glass-panel">
+            <h3>Weekly Attendance Trend</h3>
+            <canvas id="weeklyChart"></canvas>
+        </div>
+        <div class="chart-container glass-panel">
+            <h3>Attendance by Class</h3>
+            <canvas id="classChart"></canvas>
+        </div>
+    </div>
+
+    <div class="recent-activity glass-panel">
+        <h3>Recent Attendance Logs</h3>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Class</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-logs-body">
+                    <!-- Logs will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Load Chart.js from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        display: flex;
+        align-items: center;
+        padding: 1.5rem;
+        border-radius: 12px;
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-icon {
+        font-size: 2.5rem;
+        margin-right: 1rem;
+    }
+
+    .stat-info h3 {
+        margin: 0;
+        font-size: 1.8rem;
+        color: var(--primary);
+    }
+
+    .stat-info p {
+        margin: 0;
+        opacity: 0.7;
+        font-size: 0.9rem;
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 600px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .chart-container {
+        padding: 1.5rem;
+        border-radius: 12px;
+        height: 350px; /* Fixed height to prevent continuous expansion */
+        position: relative;
+    }
+
+    .chart-container h3 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+        border-left: 4px solid var(--primary);
+        padding-left: 10px;
+    }
+
+    .recent-activity {
+        padding: 1.5rem;
+        border-radius: 12px;
+    }
+
+    .recent-activity h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+        border-left: 4px solid var(--primary);
+        padding-left: 10px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    th {
+        opacity: 0.6;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+</style>
+{% endblock %}

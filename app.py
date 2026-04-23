@@ -17,9 +17,9 @@ import numpy as np
 from flask import Flask, jsonify, render_template, request, send_file
 from openpyxl import Workbook
 from pydantic import ValidationError
-from sqlalchemy import desc, extract
+from sqlalchemy import desc, extract, func, inspect, text
 
-from models import Attendance, StudentClass, User, db
+from models import Attendance, StudentClass, User, SystemSetting, db
 from schemas import AttendanceMatch, RecognizeRequest, RecognizeResponse, RegisterRequest
 from utils import FaceRecognitionUtils
 import pytz
@@ -70,25 +70,96 @@ def load_face_encodings():
     global known_face_encodings, known_face_metadata
     try:
         with app.app_context():
-            users = User.query.all()
+            # Only load active students into recognition memory
+            users = User.query.filter_by(status='active').all()
             known_face_encodings = {u.name: u.get_encoding() for u in users}
             known_face_metadata = {
                 u.name: {"class_name": u.class_name, "father_name": u.father_name} 
                 for u in users
             }
-            print(f"[System] Loaded {len(known_face_encodings)} encodings from DB.")
+            print(f"[System] Loaded {len(known_face_encodings)} active encodings from DB.")
     except Exception as e:
         print(f"[Error] Loading encodings from DB: {e}")
         known_face_encodings = {}
         known_face_metadata = {}
 
 
-def initialize_database():
-    """Creates database tables if they don't exist."""
+def migrate_database():
+    """Manually adds missing columns and tables for automatic schema updates."""
     try:
         with app.app_context():
+            inspector = inspect(db.engine)
+            
+            # 1. Check for missing tables
+            existing_tables = inspector.get_table_names()
+            if "system_settings" not in existing_tables:
+                print("[Migration] system_settings table missing, creating all tables...")
+                db.create_all()
+
+            # 2. Check for missing columns in 'users'
+            user_columns = [c["name"] for c in inspector.get_columns("users")]
+            if "academic_year" not in user_columns:
+                print("[Migration] Adding 'academic_year' column to 'users'...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN academic_year VARCHAR(20)"))
+                    conn.commit()
+            
+            if "status" not in user_columns:
+                print("[Migration] Adding 'status' column to 'users'...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'"))
+                    conn.commit()
+
+            # 3. Check for missing columns in 'student_classes'
+            class_columns = [c["name"] for c in inspector.get_columns("student_classes")]
+            if "next_class_id" not in class_columns:
+                print("[Migration] Adding 'next_class_id' column to 'student_classes'...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE student_classes ADD COLUMN next_class_id INTEGER"))
+                    conn.commit()
+
+            # 4. Check for missing columns in 'attendance'
+            attendance_columns = [c["name"] for c in inspector.get_columns("attendance")]
+            if "class_name" not in attendance_columns:
+                print("[Migration] Adding 'class_name' column to 'attendance'...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE attendance ADD COLUMN class_name VARCHAR(50)"))
+                    conn.commit()
+
+            if "academic_year" not in attendance_columns:
+                print("[Migration] Adding 'academic_year' column to 'attendance'...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE attendance ADD COLUMN academic_year VARCHAR(20)"))
+                    conn.commit()
+
+            print("[System] Database migration checks complete.")
+
+            attendance_columns = [c["name"] for c in inspector.get_columns("attendance")]
+            if "class_name" not in attendance_columns:
+                print("[Migration] Adding 'class_name' column to 'attendance'...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE attendance ADD COLUMN class_name VARCHAR(50)"))
+                    conn.commit()
+            
+            if "academic_year" not in attendance_columns:
+                print("[Migration] Adding 'academic_year' column to 'attendance'...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE attendance ADD COLUMN academic_year VARCHAR(20)"))
+                    conn.commit()
+
+            print("[System] Database migration checks complete.")
+    except Exception as e:
+        print(f"[Error] Database migration failed: {e}")
+
+
+def initialize_database():
+    """Creates database tables if they don't exist and runs migrations."""
+    try:
+        with app.app_context():
+            # Run migration first to ensure columns exist
+            migrate_database()
             db.create_all()
-            print("[System] Database initialized (Tables created if missing).")
+            print("[System] Database initialized.")
     except Exception as e:
         print(f"[Error] Database initialization failed: {e}")
 
@@ -97,20 +168,25 @@ def seed_classes():
     """Seeds the StudentClass table with initial values (1-12) if empty."""
     try:
         with app.app_context():
-            # Check if classes exist by trying to query.
-            # If table doesn't exist, this might fail, but since we use db.create_all (or assume it exists), 
-            # we should be careful. 
-            # In this setup, we assume tables are created manually or exist. 
-            # If we were using db.create_all(), we would do it before this.
             if StudentClass.query.first() is None:
                 print("[System] Seeding initial classes...")
                 initial_classes = [str(i) for i in range(1, 13)]
+                class_objs = []
                 for c_name in initial_classes:
-                    db.session.add(StudentClass(name=c_name))
+                    new_cls = StudentClass(name=c_name)
+                    db.session.add(new_cls)
+                    class_objs.append(new_cls)
+                
+                db.session.flush() # To get IDs
+
+                # Optional: Pre-set default mappings (1->2, 2->3, ..., 11->12)
+                for i in range(len(class_objs) - 1):
+                    class_objs[i].next_class_id = class_objs[i+1].id
+                
                 db.session.commit()
-                print("[System] Seeding complete.")
+                print("[System] Seeding complete with default mappings.")
     except Exception as e:
-        print(f"[Warning] Could not seed classes (Table might not exist yet): {e}")
+        print(f"[Warning] Could not seed classes: {e}")
 
 # Initial load & Migration
 initialize_database()
@@ -134,6 +210,31 @@ def get_classes():
 
 
 # --- Helper Functions ---
+
+
+def get_setting(key, default=None):
+    """Retrieves a system setting from the database."""
+    try:
+        setting = SystemSetting.query.filter_by(key=key).first()
+        return setting.value if setting else default
+    except Exception:
+        return default
+
+
+def set_setting(key, value):
+    """Sets a system setting in the database."""
+    try:
+        setting = SystemSetting.query.filter_by(key=key).first()
+        if setting:
+            setting.value = str(value)
+        else:
+            db.session.add(SystemSetting(key=key, value=str(value)))
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Error] Setting system setting {key}: {e}")
+        return False
 
 
 def mark_attendance(name: str) -> tuple[bool, str]:
@@ -313,6 +414,141 @@ def reports_page():
     """Renders the reports page."""
     users = User.query.with_entities(User.id, User.name).all()
     return render_template("reports.html", users=users)
+
+
+@app.route("/dashboard")
+def dashboard_page():
+    """Renders the dashboard page."""
+    return render_template("dashboard.html")
+
+
+@app.route("/student_analytics")
+def student_analytics_page():
+    """Renders the individual student analytics page."""
+    users = User.query.with_entities(User.id, User.name, User.class_name, User.status, User.father_name).order_by(User.name).all()
+    return render_template("student_analytics.html", users=users)
+
+
+@app.route("/api/student_calendar/<int:user_id>")
+def get_student_calendar(user_id):
+    """
+    API to fetch attendance for a specific student to be displayed on a calendar.
+    Returns:
+        - attendance_days: List of ISO dates when student was present
+        - stats: {month_present, total_present, percentage}
+    """
+    month = request.args.get("month", type=int)
+    year = request.args.get("year", type=int)
+    
+    # 1. Base Query for all attendance of this user
+    query = Attendance.query.filter(Attendance.user_id == user_id)
+    
+    # 2. Statistics (current month)
+    now_karachi = datetime.datetime.now(KARACHI_TZ)
+    curr_month = month or now_karachi.month
+    curr_year = year or now_karachi.year
+    
+    month_records = query.filter(
+        extract("month", Attendance.timestamp) == curr_month,
+        extract("year", Attendance.timestamp) == curr_year
+    ).all()
+    
+    # Use a set to get unique dates (in case of multiple marks per day)
+    present_dates = set()
+    for att in month_records:
+        local_date = ensure_utc(att.timestamp).astimezone(KARACHI_TZ).strftime("%Y-%m-%d")
+        present_dates.add(local_date)
+    
+    month_present_count = len(present_dates)
+    
+    # 3. Overall stats
+    total_present_all_time = db.session.query(db.func.count(db.distinct(db.func.date(Attendance.timestamp)))).filter(
+        Attendance.user_id == user_id
+    ).scalar() or 0
+
+    return jsonify({
+        "present_days": list(present_dates),
+        "stats": {
+            "month_present": month_present_count,
+            "total_present": total_present_all_time,
+            "month_name": datetime.date(curr_year, curr_month, 1).strftime("%B"),
+            "year": curr_year
+        }
+    })
+
+
+@app.route("/api/dashboard_stats")
+def get_dashboard_stats():
+    """
+    API to fetch statistics for the interactive dashboard.
+    Returns:
+        - total_users: Total registered students
+        - today_count: Students present today
+        - weekly_data: List of {date, count} for last 7 days
+        - class_distribution: Attendance by class for today
+        - recent_logs: Last 5 attendance records
+    """
+    now_karachi = datetime.datetime.now(KARACHI_TZ)
+    today_start = now_karachi.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_utc = today_start.astimezone(pytz.utc)
+
+    # 1. Total Users
+    total_users = User.query.count()
+
+    # 2. Today's Attendance
+    today_attendance_query = db.session.query(Attendance.user_id).filter(
+        Attendance.timestamp >= today_start_utc
+    ).distinct()
+    today_count = today_attendance_query.count()
+
+    # 3. Weekly Data (Last 7 Days)
+    weekly_data = []
+    for i in range(6, -1, -1):
+        day = today_start - datetime.timedelta(days=i)
+        day_end = day + datetime.timedelta(days=1)
+        
+        count = db.session.query(Attendance.user_id).filter(
+            Attendance.timestamp >= day.astimezone(pytz.utc),
+            Attendance.timestamp < day_end.astimezone(pytz.utc)
+        ).distinct().count()
+        
+        weekly_data.append({
+            "date": day.strftime("%Y-%m-%d"),
+            "count": count
+        })
+
+    # 4. Class Distribution (Today)
+    class_dist = db.session.query(
+        User.class_name, db.func.count(db.distinct(Attendance.user_id))
+    ).join(Attendance, User.id == Attendance.user_id).filter(
+        Attendance.timestamp >= today_start_utc
+    ).group_by(User.class_name).all()
+    
+    class_distribution = [{"class": c or "Unknown", "count": count} for c, count in class_dist]
+
+    # 5. Recent Logs
+    recent_logs_query = db.session.query(
+        Attendance, User.name, User.class_name
+    ).join(User, Attendance.user_id == User.id).order_by(
+        desc(Attendance.timestamp)
+    ).limit(5).all()
+
+    recent_logs = [
+        {
+            "name": name,
+            "class": class_name,
+            "time": ensure_utc(att.timestamp).astimezone(KARACHI_TZ).strftime("%H:%M:%S")
+        }
+        for att, name, class_name in recent_logs_query
+    ]
+
+    return jsonify({
+        "total_users": total_users,
+        "today_count": today_count,
+        "weekly_data": weekly_data,
+        "class_distribution": class_distribution,
+        "recent_logs": recent_logs
+    })
 
 
 @app.route("/api/attendance_records")
@@ -639,6 +875,147 @@ def api_recognize():
         print("[DEBUG] Recognition response - unable to inspect matches payload (non-serializable types)")
 
     return jsonify(RecognizeResponse(success=True, matches=matches_payload, attendance_error=attendance_error).model_dump())
+
+
+@app.route("/settings")
+def settings_page():
+    """Renders the settings page."""
+    return render_template("settings.html")
+
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    """API to fetch or update system settings."""
+    if request.method == "GET":
+        return jsonify({
+            "current_academic_year": get_setting("current_academic_year", "2023-2024"),
+            "session_start_month": get_setting("session_start_month", "1"),
+        })
+    
+    data = request.json
+    if "current_academic_year" in data:
+        set_setting("current_academic_year", data["current_academic_year"])
+    if "session_start_month" in data:
+        set_setting("session_start_month", data["session_start_month"])
+        
+    return jsonify({"success": True})
+
+
+@app.route("/api/classes_mapping", methods=["GET", "POST"])
+def api_classes_mapping():
+    """API to fetch or update class promotion mappings."""
+    if request.method == "GET":
+        classes = StudentClass.query.all()
+        return jsonify([
+            {
+                "id": c.id,
+                "name": c.name,
+                "next_class_id": c.next_class_id,
+                "next_class_name": c.next_class.name if c.next_class else None
+            } for c in classes
+        ])
+    
+    data = request.json # Expecting list of {id, next_class_id}
+    try:
+        for item in data:
+            cls = StudentClass.query.get(item["id"])
+            if cls:
+                cls.next_class_id = item.get("next_class_id")
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/promote_session", methods=["POST"])
+def api_promote_session():
+    """Triggers the academic session promotion process."""
+    try:
+        # 1. Increment Academic Year if provided in body, else just use current
+        current_year = get_setting("current_academic_year", "2023-2024")
+        # Simple increment logic: "2023-2024" -> "2024-2025"
+        try:
+            start_yr, end_yr = map(int, current_year.split("-"))
+            next_year = f"{start_yr + 1}-{end_yr + 1}"
+            set_setting("current_academic_year", next_year)
+        except:
+            next_year = current_year # Fallback
+
+        # 2. Promote Students
+        users = User.query.all()
+        promotion_log = []
+        
+        for user in users:
+            # Find current class object
+            curr_class = StudentClass.query.filter_by(name=user.class_name).first()
+            if curr_class and curr_class.next_class:
+                old_class = user.class_name
+                user.class_name = curr_class.next_class.name
+                user.academic_year = next_year
+                promotion_log.append(f"Promoted {user.name}: {old_class} -> {user.class_name}")
+            else:
+                # If no next class, mark as Graduated (Archive them)
+                old_class = user.class_name
+                user.status = "graduated"
+                user.academic_year = next_year
+                promotion_log.append(f"Graduated {user.name} (from {old_class})")
+        
+        db.session.commit()
+        load_face_encodings() # Update memory cache
+        return jsonify({"success": True, "next_year": next_year, "log": promotion_log})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/students/<int:user_id>/edit", methods=["POST"])
+def api_edit_student(user_id):
+    """API to edit student information."""
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"success": False, "message": "Student not found"}), 404
+        
+        data = request.json
+        if "name" in data:
+            user.name = data["name"]
+        if "father_name" in data:
+            user.father_name = data["father_name"]
+        if "class_name" in data:
+            user.class_name = data["class_name"]
+            # Auto-add class if missing
+            if user.class_name:
+                cls_obj = StudentClass.query.filter_by(name=user.class_name).first()
+                if not cls_obj:
+                    db.session.add(StudentClass(name=user.class_name))
+        
+        if "status" in data:
+            user.status = data["status"]
+        
+        db.session.commit()
+        load_face_encodings()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/students/<int:user_id>", methods=["DELETE"])
+def api_delete_student(user_id):
+    """API to delete a student and their attendance records."""
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"success": False, "message": "Student not found"}), 404
+        
+        db.session.delete(user)
+        db.session.commit()
+        load_face_encodings()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 if __name__ == "__main__":

@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Smart Attendance{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <header class="page-header">
+        <h1>System Settings</h1>
+        <p>Manage academic sessions and class promotion mappings.</p>
+    </header>
+
+    <div class="settings-grid">
+        <!-- Session Settings -->
+        <section class="settings-card glass-panel">
+            <h3>Academic Session</h3>
+            <div class="form-group">
+                <label for="current-academic-year">Current Academic Year</label>
+                <input type="text" id="current-academic-year" placeholder="e.g., 2023-2024" class="glass-input">
+            </div>
+            <div class="form-group">
+                <label for="session-start-month">Session Start Month</label>
+                <select id="session-start-month" class="glass-input">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <button id="save-settings-btn" class="btn btn-primary">Save Settings</button>
+        </section>
+
+        <!-- Promotion Mapping -->
+        <section class="settings-card glass-panel">
+            <h3>Class Promotion Mapping</h3>
+            <p class="help-text">Define which class students move to when a new session starts.</p>
+            <div class="table-responsive">
+                <table id="mapping-table">
+                    <thead>
+                        <tr>
+                            <th>Current Class</th>
+                            <th>Next Class</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mapping-body">
+                        <!-- Mappings will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            <button id="save-mapping-btn" class="btn btn-secondary">Save Mappings</button>
+        </section>
+
+        <!-- Dangerous Actions -->
+        <section class="settings-card glass-panel danger-zone">
+            <h3>Danger Zone</h3>
+            <p>Promoting a session will update all students to their next class and increment the academic year. This cannot be easily undone.</p>
+            <button id="promote-session-btn" class="btn btn-danger">Start New Academic Session</button>
+        </section>
+    </div>
+</div>
+
+<!-- Promotion Log Modal -->
+<div id="log-modal" class="modal">
+    <div class="modal-content glass-panel">
+        <span class="close-btn">&times;</span>
+        <h2>Promotion Log</h2>
+        <div id="log-content" style="max-height: 400px; overflow-y: auto; text-align: left; font-family: monospace; font-size: 0.9rem; white-space: pre-wrap; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+        </div>
+    </div>
+</div>
+
+<style>
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+
+    .settings-card {
+        padding: 2rem;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .settings-card h3 {
+        margin: 0;
+        color: var(--primary);
+        font-size: 1.25rem;
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        opacity: 0.7;
+        margin: -1rem 0 0 0;
+    }
+
+    .danger-zone {
+        border: 1px solid rgba(255, 68, 68, 0.2);
+    }
+
+    .btn-danger {
+        background: #ff4444;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #cc0000;
+    }
+
+    #mapping-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    #mapping-table th, #mapping-table td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.8);
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+        margin: 10% auto;
+        padding: 2rem;
+        width: 80%;
+        max-width: 600px;
+        position: relative;
+    }
+
+    .close-btn {
+        position: absolute;
+        top: 1rem;
+        right: 1.5rem;
+        font-size: 2rem;
+        cursor: pointer;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const yearInput = document.getElementById('current-academic-year');
+    const monthSelect = document.getElementById('session-start-month');
+    const mappingBody = document.getElementById('mapping-body');
+    const logModal = document.getElementById('log-modal');
+    const logContent = document.getElementById('log-content');
+    const closeBtn = document.querySelector('.close-btn');
+
+    let allClasses = [];
+
+    // Load initial settings
+    fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+            yearInput.value = data.current_academic_year;
+            monthSelect.value = data.session_start_month;
+        });
+
+    // Load class mappings
+    function loadMappings() {
+        fetch('/api/classes_mapping')
+            .then(res => res.json())
+            .then(data => {
+                allClasses = data;
+                mappingBody.innerHTML = '';
+                data.forEach(cls => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${cls.name}</td>
+                        <td>
+                            <select class="glass-input mapping-select" data-id="${cls.id}">
+                                <option value="">- Graduated -</option>
+                                ${data.map(c => `<option value="${c.id}" ${c.id === cls.next_class_id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                            </select>
+                        </td>
+                    `;
+                    mappingBody.appendChild(row);
+                });
+            });
+    }
+
+    loadMappings();
+
+    // Save Settings
+    document.getElementById('save-settings-btn').addEventListener('click', () => {
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                current_academic_year: yearInput.value,
+                session_start_month: monthSelect.value
+            })
+        }).then(() => alert('Settings saved!'));
+    });
+
+    // Save Mappings
+    document.getElementById('save-mapping-btn').addEventListener('click', () => {
+        const mappings = Array.from(document.querySelectorAll('.mapping-select')).map(sel => ({
+            id: parseInt(sel.dataset.id),
+            next_class_id: sel.value ? parseInt(sel.value) : null
+        }));
+
+        fetch('/api/classes_mapping', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(mappings)
+        }).then(() => alert('Mappings saved!'));
+    });
+
+    // Promote Session
+    document.getElementById('promote-session-btn').addEventListener('click', () => {
+        if (!confirm('Are you sure you want to start a new session? This will promote all students to their next classes.')) return;
+
+        const btn = document.getElementById('promote-session-btn');
+        btn.disabled = true;
+        btn.textContent = 'Processing...';
+
+        fetch('/api/promote_session', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = 'Start New Academic Session';
+                
+                if (data.success) {
+                    logContent.textContent = data.log.join('\n');
+                    logModal.style.display = 'block';
+                    yearInput.value = data.next_year;
+                    alert('Promotion complete!');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            });
+    });
+
+    closeBtn.onclick = () => logModal.style.display = 'none';
+    window.onclick = (e) => { if (e.target == logModal) logModal.style.display = 'none'; };
+});
+</script>
+{% endblock %}
