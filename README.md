@@ -1,101 +1,90 @@
-# SmartAttendanceSystem
+# Smart Attendance System
 
-This project implements a smart attendance system using face recognition. It leverages computer vision libraries like MediaPipe and OpenCV, and uses ONNX models for efficient face detection and embedding generation.
+A web-based smart attendance system using face recognition. It leverages a Flask backend, MediaPipe for face detection and alignment, and ONNX models for efficient face embedding generation.
 
 ## Features
 
-- **Face Registration:** Register students by capturing their face via webcam and saving their face embeddings.
-- **Face Recognition:** Recognize registered students from webcam feed and mark their attendance.
-- **Attendance Logging:** Records attendance in a CSV file with student name and timestamp.
+- **Web Interface:** Easy-to-use browser-based interface for registration, recognition, and reporting.
+- **Face Registration:** Register students by capturing their face via webcam directly from the browser.
+- **Face Recognition:** Real-time face recognition from the webcam feed to mark attendance automatically.
+- **Attendance Management & Reports:** View attendance records with advanced filtering and export them to CSV, JSON, or Excel.
+- **Database Storage:** Uses SQLite and SQLAlchemy to robustly store user profiles, face encodings, and attendance logs.
 
 ## Technologies Used
 
-- Python 3.11+
-- `mediapipe`: For face detection and landmark extraction.
-- `numpy`: For numerical operations, especially with embeddings.
-- `onnxruntime`: For running optimized ONNX (Open Neural Network Exchange) models for face detection (SCRFD) and embedding generation (Mobile-ArcFace/MobileFaceNet).
-- `opencv-python`: For webcam access, image processing, and drawing annotations.
-- `uv`: A fast Python package installer and resolver.
+- **Backend:** Python 3.11+, Flask, Flask-SQLAlchemy, Pydantic
+- **Computer Vision:** `mediapipe` (face detection/landmarks), `opencv-python` (image processing), `numpy`, `onnxruntime` (Mobile-ArcFace/MobileFaceNet for embeddings)
+- **Database:** SQLite
+- **Package Management:** `uv`
 
 ## Setup and Installation
 
-1.  **Clone the repository:**
+1. **Clone the repository:**
 
-    ```bash
-    git clone https://github.com/your-username/SmartAttendanceSystem.git
-    cd SmartAttendanceSystem
-    ```
+   ```bash
+   git clone https://github.com/your-username/SmartAttendanceSystem.git
+   cd SmartAttendanceSystem
+   ```
 
-2.  **Install `uv` (if not already installed):**
+2. **Install `uv` (if not already installed):**
 
-    ```bash
-    pip install uv
-    ```
+   ```bash
+   pip install uv
+   ```
 
-    (Or follow instructions on the `uv` website for your OS)
+3. **Install dependencies using `uv`:**
 
-3.  **Install dependencies using `uv`:**
+   ```bash
+   uv sync
+   ```
 
-    ```bash
-    uv sync
-    ```
+4. **Download ONNX Model:**
+   Place your `arcface_mobile.onnx` (a face embedding model) into the `models/` directory. This model is used to generate 512-dimensional face embeddings from aligned face crops.
 
-4.  **Download ONNX Models:**
-    Place your `scrfd.onnx` (a small face detection model) and `arcface_mobile.onnx` (a face embedding model) into the `models/` directory. These models are not included in the repository due to their size, and can be obtained from various open-source computer vision model hubs.
+   ```
+   SmartAttendanceSystem/
+   ├── models/
+   │   └── arcface_mobile.onnx
+   └── ...
+   ```
 
-    Example:
+5. **Run the application:**
 
-    ```
-    SmartAttendanceSystem/
-    ├── models/
-    │   ├── scrfd.onnx
-    │   └── arcface_mobile.onnx
-    └── ...
-    ```
+   ```bash
+   uv run app.py
+   ```
+
+6. **Access the Web App:**
+   Open your browser and navigate to `https://localhost:5000` or `https://127.0.0.1:5000`. 
+   
+   *Note: Your browser might display a security warning because the app uses an ad-hoc self-signed SSL certificate (`ssl_context="adhoc"`). You can safely bypass this warning for local development. HTTPS is required by modern browsers to allow webcam access.*
 
 ## Usage
 
 ### 1. Register a Student
-
-To register a new student, run the `register.py` script:
-
-```bash
-uv run register.py
-```
-
-Follow the prompts to enter the student's name and capture their face using your webcam. Press `SPACE` to capture the face when it's clearly visible.
+Navigate to the **Register** page from the navigation bar. Enter the student's name and capture their face using your webcam to save their face embedding to the database.
 
 ### 2. Start Attendance Recognition
+Navigate to the **Recognize** page. The system will use your webcam to detect and recognize faces in real time. If a registered face is recognized, their attendance will be marked in the database.
 
-To start the attendance system, run the `recognize.py` script:
-
-```bash
-uv run recognize.py
-```
-
-The system will use your webcam to detect and recognize faces. If a registered face is recognized, their attendance will be marked in `attendance.csv`.
-
-**Note:**
-
-- Ensure proper lighting and a clear view of the face for optimal performance.
-- Adjust the `THRESHOLD` in `recognize.py` if needed (a lower value means stricter recognition).
+### 3. View Reports
+Navigate to the **Reports** page to view a table of attendance records. You can filter by date or specific user, and export the data in CSV, JSON, or Excel formats.
 
 ## Project Structure
 
-- `register.py`: Script for registering new student faces.
-- `recognize.py`: Main script for real-time face recognition and attendance marking.
-- `utils.py`: Contains core computer vision functionalities, including face detection (SCRFD/MediaPipe), face alignment, and embedding generation using ONNX models.
-- `models/`: Directory to store the ONNX face detection and embedding models.
-- `encodings/`: Directory where registered face embeddings (`.npy` files) are stored.
-- `attendance.csv`: CSV file to log attendance records.
-- `pyproject.toml`: Project metadata and dependency definitions (PEP 621).
-- `uv.lock`: Lock file for `uv` package manager, ensuring reproducible environments.
-- `Frontend/index.html`: (Unused in current Python scripts, but present in the directory structure).
+- `app.py`: Main Flask application handling routes, APIs, and business logic.
+- `models.py`: SQLAlchemy database models (`User` and `Attendance`).
+- `schemas.py`: Pydantic schemas for strict API request/response validation.
+- `utils.py`: Core computer vision utilities (MediaPipe face detection, ArcFace embedding).
+- `templates/`: HTML templates for the web interface.
+- `static/`: Static assets (CSS, JS).
+- `models/`: Directory to store the ONNX face embedding model.
+- `instance/`: Directory automatically created by Flask-SQLAlchemy to store the SQLite database (`attendance.db`).
+- `pyproject.toml` & `uv.lock`: Dependency definitions and lock file.
 
 ## Development Conventions
 
 - Python 3.11+ is required.
-- Dependencies are managed using `uv`.
-- Face detection uses SCRFD (if available) or MediaPipe.
-- Face embeddings are generated using a Mobile-ArcFace/MobileFaceNet ONNX model.
-- Face encodings are stored as NumPy array (`.npy`) files.
+- Dependencies are strictly managed using `uv`.
+- Face detection relies on MediaPipe Face Mesh (replacing older SCRFD implementations).
+- Face embeddings are generated using a Mobile-ArcFace ONNX model and stored as pickled NumPy arrays (BLOBs) in the database.
